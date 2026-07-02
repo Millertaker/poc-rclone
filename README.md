@@ -6,15 +6,27 @@ After a PR is merged into `main`, `.github/workflows/deploy-to-dev.yml` runs
 automatically and deploys to the dotCMS Dev environment:
 
 1. Checkout the repo.
-2. Generate `rclone.conf` at runtime from repository secrets (never committed).
+2. Generate `rclone.conf` at runtime from repository secrets/variables (never committed).
 3. Smoke-check `DOTCMS_DEV_URL` before deploying, failing the job if Dev is unreachable.
 4. Run `scripts/deploy-dev.sh` to sync assets over WebDAV via `rclone sync`.
 5. Smoke-check again after deploying.
 
-Required repository secrets (repo-level, not org-level):
-`DOTCMS_DEV_WEBDAV_URL`, `DOTCMS_USER`, `DOTCMS_PASS`, `DOTCMS_DEV_URL`.
-Optional: `DOTCMS_LANGUAGE_ID` (numeric dotCMS language id; defaults to `1`
-if unset, dotCMS's out-of-the-box default language / en-us).
+Required repository config (repo-level, not org-level), in
+`Settings → Secrets and variables → Actions`:
+
+- **Secrets** (sensitive credentials): `DOTCMS_USER`, `DOTCMS_PASS`
+- **Variables** (non-sensitive config): `DOTCMS_DEV_WEBDAV_URL`, `DOTCMS_DEV_URL`
+
+`DOTCMS_DEV_WEBDAV_URL` must be the **full** WebDAV live URL, including the
+language id, e.g.:
+
+```
+https://<server>/webdav/live/1
+```
+
+The scripts use this value directly as the rclone remote root — they don't
+append `/live/<languageId>` themselves, so the full path has to be in the
+variable already.
 
 ### Why deploy-dev.sh writes to `live`
 
@@ -36,15 +48,15 @@ dotCMS admin UI) and needs to be reconciled back into git.
 scripts/pull-dev.sh
 ```
 
-Pulls `dotcms-dev:/live/{languageId}` into `./files/live/en-us`.
+Pulls `DOTCMS_DEV_WEBDAV_URL` into `./files/live/en-us`.
 
 It uses `rclone sync`, which mirrors the remote exactly (including deleting
 local files that no longer exist on the server). This is safe here because
 the repo is version-controlled: review `git status`/`git diff` after running
 it and before committing, so any unexpected change or deletion is visible
-first. Requires the same `DOTCMS_DEV_WEBDAV_URL`, `DOTCMS_USER`, `DOTCMS_PASS`,
-and (optionally) `DOTCMS_LANGUAGE_ID` environment variables as the deploy
-script, and the same `dotcms-dev` rclone remote configured locally.
+first. Requires the same `DOTCMS_DEV_WEBDAV_URL`, `DOTCMS_USER`, `DOTCMS_PASS`
+environment variables as the deploy script, and the same `dotcms-dev` rclone
+remote configured locally.
 
 ## Running the scripts locally
 

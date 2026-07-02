@@ -7,6 +7,9 @@ on:
   push:
     branches:
       - main
+  # Lets you trigger a run manually from the Actions tab, useful for
+  # testing in a sandbox without needing a new commit each time.
+  workflow_dispatch: {}
 
 # Prevent overlapping deploys if multiple merges land in quick succession;
 # let the latest push win and cancel any in-flight deploy.
@@ -21,18 +24,21 @@ jobs:
     timeout-minutes: 20
 
     env:
-      DOTCMS_DEV_WEBDAV_URL: ${{ secrets.DOTCMS_DEV_WEBDAV_URL }}
+      # Credentials: repository secrets (sensitive).
       DOTCMS_USER: ${{ secrets.DOTCMS_USER }}
       DOTCMS_PASS: ${{ secrets.DOTCMS_PASS }}
-      DOTCMS_DEV_URL: ${{ secrets.DOTCMS_DEV_URL }}
-      # Optional: numeric dotCMS language id (defaults to 1 in the scripts
-      # if this secret is not set). Only needed if the FHLB Dev instance
-      # uses a non-default language id for en-us.
-      DOTCMS_LANGUAGE_ID: ${{ secrets.DOTCMS_LANGUAGE_ID }}
+      # Non-sensitive config: repository variables, not secrets.
+      # DOTCMS_DEV_WEBDAV_URL is the full WebDAV live URL, e.g.
+      # https://<server>/webdav/live/<languageId>.
+      DOTCMS_DEV_WEBDAV_URL: ${{ vars.DOTCMS_DEV_WEBDAV_URL }}
+      DOTCMS_DEV_URL: ${{ vars.DOTCMS_DEV_URL }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | sudo bash
 
       - name: Configure rclone from secrets
         # rclone.conf is generated at runtime from repository secrets and is
