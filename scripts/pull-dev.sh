@@ -44,7 +44,14 @@ LOCAL_LIVE_DIR="./files/live/en-us"
 
 LIVE_SOURCE="${RCLONE_REMOTE}:/live/${LANGUAGE_ID}"
 
-RCLONE_FLAGS=(--checksum --progress --stats=15s)
+# system/languages holds dotCMS's language property files, which require the
+# CMS Admin/Administrator role to read over WebDAV
+# (https://dev.dotcms.com/docs/webdav). dotCMS still lists this folder to
+# every user, so rclone always sees it, but a non-admin account gets
+# "directory not found" trying to actually read it -- which fails the whole
+# sync even though the real template/page content transferred fine.
+# It's not content we sync anyway, so exclude it outright.
+RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**")
 
 log() {
     printf '[pull-dev] %s\n' "$1"

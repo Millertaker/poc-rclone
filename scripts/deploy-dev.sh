@@ -40,7 +40,11 @@ LIVE_TARGET="${RCLONE_REMOTE}:/live/${LANGUAGE_ID}"
 # Common rclone flags:
 #   credentials live in the generated rclone.conf, not on the command line,
 #   so they never appear in process listings or logs.
-RCLONE_FLAGS=(--checksum --progress --stats=15s)
+#   system/languages holds dotCMS's language property files, which require
+#   the CMS Admin/Administrator role over WebDAV
+#   (https://dev.dotcms.com/docs/webdav) and aren't part of the
+#   template/page content this script deploys, so exclude that path.
+RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**")
 
 log() {
     printf '[deploy-dev] %s\n' "$1"
