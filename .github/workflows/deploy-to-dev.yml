@@ -1,0 +1,50 @@
+name: Deploy to Dev
+
+# Runs automatically once a PR is merged into main. Branch protection
+# (required review, Semgrep scan, enforce_admins) already gates what lands
+# on main, so this workflow only needs to worry about deploying it.
+on:
+  push:
+    branches:
+      - main
+
+# Prevent overlapping deploys if multiple merges land in quick succession;
+# let the latest push win and cancel any in-flight deploy.
+concurrency:
+  group: deploy-to-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Dev (dotCMS via rclone/WebDAV)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DOTCMS_DEV_WEBDAV_URL: ${{ secrets.DOTCMS_DEV_WEBDAV_URL }}
+      DOTCMS_USER: ${{ secrets.DOTCMS_USER }}
+      DOTCMS_PASS: ${{ secrets.DOTCMS_PASS }}
+      DOTCMS_DEV_URL: ${{ secrets.DOTCMS_DEV_URL }}
+      # Optional: numeric dotCMS language id (defaults to 1 in the scripts
+      # if this secret is not set). Only needed if the FHLB Dev instance
+      # uses a non-default language id for en-us.
+      DOTCMS_LANGUAGE_ID: ${{ secrets.DOTCMS_LANGUAGE_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure rclone from secrets
+        # rclone.conf is generated at runtime from repository secrets and is
+        # never committed to the repo. It is written to the runner's
+        # ephemeral rclone config path, which is discarded when the job ends.
+        run: ./scripts/configure-rclone.sh
+
+      - name: Smoke check (before deploy)
+        run: ./scripts/smoke-check.sh
+
+      - name: Deploy assets (rclone sync to live)
+        run: ./scripts/deploy-dev.sh
+
+      - name: Smoke check (after deploy)
+        run: ./scripts/smoke-check.sh

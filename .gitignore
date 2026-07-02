@@ -1,0 +1,22 @@
+# rclone config must never be committed -- it is generated at runtime from
+# GitHub secrets (see .github/workflows/deploy-to-dev.yml). If you generate
+# one locally for testing, keep it out of the repo.
+rclone.conf
+*.rclone.conf
+
+# Local env/secret files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
