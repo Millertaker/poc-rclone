@@ -8,7 +8,8 @@
 # locally (populated from .env, which is gitignored -- see .env.example).
 #
 # Required environment variables:
-#   DOTCMS_DEV_WEBDAV_URL - WebDAV endpoint for the Dev dotCMS instance
+#   DOTCMS_DEV_WEBDAV_URL - full WebDAV live URL for the Dev dotCMS instance,
+#                           e.g. https://<server>/webdav/live/<languageId>
 #   DOTCMS_USER           - WebDAV/dotCMS username
 #   DOTCMS_PASS           - WebDAV/dotCMS password
 #
@@ -40,3 +41,4 @@ EOF
 chmod 600 "${RCLONE_CONFIG_FILE}"
 
 echo "[configure-rclone] Wrote ${RCLONE_CONFIG_FILE} (remote: dotcms-dev)"
+echo "[configure-rclone] Base WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL}"

@@ -13,20 +13,18 @@
 # here: any unexpected change or deletion shows up in `git diff`/`git status`
 # before it is committed, so nothing is silently lost.
 #
+# DOTCMS_DEV_WEBDAV_URL is the full WebDAV root to pull from, e.g.
+#   https://<server>/webdav/live/<languageId>
+#
 # Usage:
 #   scripts/pull-dev.sh
-#     pulls dotcms-dev:/live/{languageId} -> ./files/live/en-us
+#     pulls DOTCMS_DEV_WEBDAV_URL -> ./files/live/en-us
 #
 # Required environment variables:
-#   DOTCMS_DEV_WEBDAV_URL - WebDAV endpoint for the Dev dotCMS instance
+#   DOTCMS_DEV_WEBDAV_URL - full WebDAV live URL for the Dev dotCMS instance
+#                           (see above)
 #   DOTCMS_USER           - WebDAV/dotCMS username
 #   DOTCMS_PASS           - WebDAV/dotCMS password
-#
-# Optional environment variables:
-#   DOTCMS_LANGUAGE_ID - numeric dotCMS language id to pull from (defaults
-#                         to 1, dotCMS's out-of-the-box default language /
-#                         en-us). Override if the FHLB Dev instance uses a
-#                         different default language id.
 #
 # This script assumes an rclone remote named "dotcms-dev" has already been
 # configured, e.g. via:
@@ -36,13 +34,13 @@
 set -euo pipefail
 
 RCLONE_REMOTE="dotcms-dev"
-LANGUAGE_ID="${DOTCMS_LANGUAGE_ID:-1}"
 
-# Local destination directory (locale-named folder), unrelated to the
-# numeric language id used in the dotCMS WebDAV URL below.
+# Local destination directory (locale-named folder).
 LOCAL_LIVE_DIR="./files/live/en-us"
 
-LIVE_SOURCE="${RCLONE_REMOTE}:/live/${LANGUAGE_ID}"
+# Remote source: the bare configured remote, since DOTCMS_DEV_WEBDAV_URL
+# already points directly at the live/<languageId> root.
+LIVE_SOURCE="${RCLONE_REMOTE}:"
 
 # system/languages holds dotCMS's language property files, which require the
 # CMS Admin/Administrator role to read over WebDAV
@@ -58,8 +56,9 @@ log() {
 }
 
 log "Starting pull from Dev via rclone/WebDAV"
-log "Remote: ${RCLONE_REMOTE} (language id: ${LANGUAGE_ID})"
-log "Pulling: ${LIVE_SOURCE} -> ${LOCAL_LIVE_DIR}"
+log "Remote: ${RCLONE_REMOTE}"
+log "WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL:-<not set>}"
+log "Pulling: ${LIVE_SOURCE} (${DOTCMS_DEV_WEBDAV_URL:-<not set>}) -> ${LOCAL_LIVE_DIR}"
 
 mkdir -p "${LOCAL_LIVE_DIR}"
 
