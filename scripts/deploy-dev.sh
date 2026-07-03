@@ -11,6 +11,21 @@
 # this pipeline only runs after a PR has already been reviewed and passed
 # Semgrep on main, content should go live directly.
 #
+# ##########################################################################
+# # WARNING -- NEVER PLACE FILES DIRECTLY IN A HOST/SITE ROOT FOLDER       #
+# #                                                                        #
+# # e.g. files/live/en-us/default/foo.vtl               <- WILL FAIL      #
+# #      files/live/en-us/default/templates/foo.vtl     <- OK             #
+# #                                                                        #
+# # dotCMS's WebDAV MKCOL handler returns 500 (not the expected 405) when #
+# # asked to create a Host/Site folder that already exists. rclone issues #
+# # MKCOL against a file's immediate parent before every upload -- if a   #
+# # file sits directly in the host folder, that parent IS the host, and  #
+# # the sync hangs retrying, then fails. This is checked automatically   #
+# # below via scripts/check-content-structure.sh. See                    #
+# # doc/webdav-mkcol-bug.md for the full writeup and evidence.           #
+# ##########################################################################
+#
 # Required environment variables (populated from GitHub Actions secrets/vars):
 #   DOTCMS_DEV_WEBDAV_URL - full WebDAV live URL for the Dev dotCMS instance
 #                           (see above)
@@ -55,6 +70,12 @@ log "Syncing: ${LOCAL_SOURCE_DIR} -> ${LIVE_TARGET} (${DOTCMS_DEV_WEBDAV_URL:-<n
 # live on the server. Refuse to run rather than risk that.
 if [[ ! -d "${LOCAL_SOURCE_DIR}" ]] || [[ -z "$(find "${LOCAL_SOURCE_DIR}" -type f -print -quit)" ]]; then
     log "ERROR: ${LOCAL_SOURCE_DIR} does not exist or has no files -- refusing to sync an empty source, which would delete everything on ${LIVE_TARGET}"
+    exit 1
+fi
+
+# See the WARNING at the top of this file and doc/webdav-mkcol-bug.md.
+if ! ./scripts/check-content-structure.sh "${LOCAL_SOURCE_DIR}"; then
+    log "ERROR: refusing to sync -- fix the file placement above and try again"
     exit 1
 fi
 
