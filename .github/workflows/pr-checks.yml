@@ -1,0 +1,22 @@
+name: PR Checks
+
+# Runs on every PR targeting main, before merge. Catches file-structure
+# mistakes that would otherwise only surface as a confusing rclone/WebDAV
+# failure during the Deploy to Dev workflow after merge.
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-file-structure:
+    name: No loose files in host root (see doc/webdav-mkcol-bug.md)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check no loose files directly in host root
+        run: ./scripts/check-content-structure.sh
