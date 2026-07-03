@@ -1,0 +1,8 @@
+## Status/health check endpoint.
+## GET https://<host>/api/vtl/status
+## Docs: https://dev.dotcms.com/docs/scripting-api
+$response.setContentType("application/json")
+
+$dotJSON.put("status", "ok")
+$dotJSON.put("host", "$host")
+$dotJSON.put("timestamp", $date.format('yyyy-MM-dd HH:mm:ss', $date.calendar))
