@@ -9,10 +9,11 @@ server). This project only ever targets that one host, hardcoded as
 `default` in `deploy-dev.sh`/`pull-dev.sh` — there is no multi-site
 support and none is planned.
 
-Never place files directly inside `content/` itself (e.g. `content/foo.vtl`)
-— they must live in a subfolder (e.g. `content/templates/foo.vtl`). See
-`doc/webdav-mkcol-bug.md` for why; `scripts/check-content-structure.sh`
-enforces this automatically on every deploy and on every PR.
+Files directly inside `content/` (e.g. `content/robots.txt`,
+`content/sitemap.xml`) are allowed and get deployed too — `deploy-dev.sh`
+just handles them differently than subfolders (a direct HTTP upload
+instead of `rclone sync`), because of a dotCMS WebDAV quirk. See
+`doc/webdav-mkcol-bug.md` for why.
 
 ## Deploy to Dev
 

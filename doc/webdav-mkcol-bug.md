@@ -2,10 +2,11 @@
 
 > **Scope: this only affects the Host/Site root folder itself** (e.g.
 > `default/`), not regular subfolders. `MKCOL` on any existing subfolder
-> under a Host (e.g. `default/templates/`) works fine. As long as content
-> is never placed directly at the Host root — always at least one
-> subfolder deep — this bug never triggers. See "Evidence" below for the
-> tests that isolate this to the Host folder specifically.
+> under a Host (e.g. `default/templates/`) works fine. Files placed
+> directly at the Host root (e.g. `robots.txt`) still work, they just have
+> to be uploaded via a raw HTTP `PUT` instead of `rclone sync`/`copy` — see
+> "Workaround in use" below. See "Evidence" below for the tests that
+> isolate this to the Host folder specifically.
 
 ## What is MKCOL
 
@@ -115,22 +116,20 @@ files directly at the Host root (e.g. `default/page.vtl`). Uploading into
 any real subfolder (e.g. `default/templates/page.vtl`) — which is how
 content is normally organized in a dotCMS site anyway — is unaffected.
 
-**Workaround in use**: keep all synced content under a real subfolder
-beneath the Host (never place files loose at the Host root). With that
-constraint, `rclone sync`/`copy` works correctly and this bug is avoided
-entirely without any client-side changes.
+**Workaround in use**: some files genuinely have to live at the Host root
+by convention (`robots.txt`, `sitemap.xml`, etc.), so blocking root-level
+files outright isn't practical. Instead, `deploy-dev.sh` handles the two
+cases differently:
+- subfolders (`content/templates/`, `content/widgets/`, ...) sync via
+  `rclone sync`, scoped to their own remote path under the Host — never
+  touches the Host folder itself, so it never hits this bug
+- any file directly in `content/` uploads via a raw HTTP `PUT` (no MKCOL
+  preflight), which works fine against the Host folder even though it
+  already exists
+
+See `scripts/deploy-dev.sh` for the implementation.
 
 ## Suggested fix
 Update the WebDAV `MKCOL` handler to return `405 Method Not Allowed` (or
 `423 Locked`) when the target is an existing Host/Site folder, matching
 the behavior already correctly implemented for ordinary existing folders.
-
-## Automated check in this repo
-`scripts/check-content-structure.sh` scans the local content tree and
-fails (with a clear message pointing back to this doc) if any file sits
-directly at a Host root. It runs:
-- inside `scripts/deploy-dev.sh`, before every sync to Dev
-- in `.github/workflows/pr-checks.yml`, on every PR targeting `main`
-
-This is a general-purpose content-structure checker — add other structural
-validations to it as they come up, not just this one.
