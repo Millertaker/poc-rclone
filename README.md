@@ -1,5 +1,19 @@
 # poc-rclone
 
+## Content layout
+
+All content that gets synced to dotCMS lives in `./content` at the repo
+root — it maps 1:1 to the `default` host root on the dotCMS WebDAV server
+(`content/templates/foo.vtl` on disk ↔ `default/templates/foo.vtl` on the
+server). This project only ever targets that one host, hardcoded as
+`default` in `deploy-dev.sh`/`pull-dev.sh` — there is no multi-site
+support and none is planned.
+
+Never place files directly inside `content/` itself (e.g. `content/foo.vtl`)
+— they must live in a subfolder (e.g. `content/templates/foo.vtl`). See
+`doc/webdav-mkcol-bug.md` for why; `scripts/check-content-structure.sh`
+enforces this automatically on every deploy and on every PR.
+
 ## Deploy to Dev
 
 After a PR is merged into `main`, `.github/workflows/deploy-to-dev.yml` runs
@@ -48,7 +62,7 @@ dotCMS admin UI) and needs to be reconciled back into git.
 scripts/pull-dev.sh
 ```
 
-Pulls `DOTCMS_DEV_WEBDAV_URL` into `./files/live/en-us`.
+Pulls `DOTCMS_DEV_WEBDAV_URL/default` into `./content`.
 
 It uses `rclone sync`, which mirrors the remote exactly (including deleting
 local files that no longer exist on the server). This is safe here because

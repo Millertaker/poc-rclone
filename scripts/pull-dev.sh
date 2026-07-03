@@ -18,7 +18,7 @@
 #
 # Usage:
 #   scripts/pull-dev.sh
-#     pulls DOTCMS_DEV_WEBDAV_URL -> ./files/live/en-us
+#     pulls DOTCMS_DEV_WEBDAV_URL/default -> ./content
 #
 # Required environment variables:
 #   DOTCMS_DEV_WEBDAV_URL - full WebDAV live URL for the Dev dotCMS instance
@@ -35,20 +35,22 @@ set -euo pipefail
 
 RCLONE_REMOTE="dotcms-dev"
 
-# Local destination directory (locale-named folder).
-LOCAL_LIVE_DIR="./files/live/en-us"
+# This project only ever targets a single dotCMS host/site, "default".
+DOTCMS_HOST="default"
 
-# Remote source: the bare configured remote, since DOTCMS_DEV_WEBDAV_URL
-# already points directly at the live/<languageId> root.
-LIVE_SOURCE="${RCLONE_REMOTE}:"
+# Local destination directory. content/ maps directly to the "default"
+# host root on the server -- there is no extra locale or host-named
+# subfolder locally.
+LOCAL_LIVE_DIR="./content"
+
+LIVE_SOURCE="${RCLONE_REMOTE}:${DOTCMS_HOST}"
 
 # system/languages holds dotCMS's language property files, which require the
 # CMS Admin/Administrator role to read over WebDAV
 # (https://dev.dotcms.com/docs/webdav). dotCMS still lists this folder to
-# every user, so rclone always sees it, but a non-admin account gets
-# "directory not found" trying to actually read it -- which fails the whole
-# sync even though the real template/page content transferred fine.
-# It's not content we sync anyway, so exclude it outright.
+# every user, but it lives outside the "default" host anyway, so it's
+# never touched by this pull. --exclude kept here in case a future host
+# path ever surfaces something similar.
 RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**")
 
 log() {
@@ -56,9 +58,9 @@ log() {
 }
 
 log "Starting pull from Dev via rclone/WebDAV"
-log "Remote: ${RCLONE_REMOTE}"
+log "Remote: ${RCLONE_REMOTE} (host: ${DOTCMS_HOST})"
 log "WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL:-<not set>}"
-log "Pulling: ${LIVE_SOURCE} (${DOTCMS_DEV_WEBDAV_URL:-<not set>}) -> ${LOCAL_LIVE_DIR}"
+log "Pulling: ${LIVE_SOURCE} (${DOTCMS_DEV_WEBDAV_URL:-<not set>}/${DOTCMS_HOST}) -> ${LOCAL_LIVE_DIR}"
 
 mkdir -p "${LOCAL_LIVE_DIR}"
 
