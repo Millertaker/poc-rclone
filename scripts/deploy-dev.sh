@@ -12,18 +12,19 @@
 # Semgrep on main, content should go live directly.
 #
 # ##########################################################################
-# # WARNING -- NEVER PLACE FILES DIRECTLY IN A HOST/SITE ROOT FOLDER       #
+# # WARNING -- NEVER PLACE FILES DIRECTLY IN content/ ITSELF               #
 # #                                                                        #
-# # e.g. files/live/en-us/default/foo.vtl               <- WILL FAIL      #
-# #      files/live/en-us/default/templates/foo.vtl     <- OK             #
+# # e.g. content/foo.vtl                                <- WILL FAIL      #
+# #      content/templates/foo.vtl                      <- OK             #
 # #                                                                        #
 # # dotCMS's WebDAV MKCOL handler returns 500 (not the expected 405) when #
-# # asked to create a Host/Site folder that already exists. rclone issues #
-# # MKCOL against a file's immediate parent before every upload -- if a   #
-# # file sits directly in the host folder, that parent IS the host, and  #
-# # the sync hangs retrying, then fails. This is checked automatically   #
-# # below via scripts/check-content-structure.sh. See                    #
-# # doc/webdav-mkcol-bug.md for the full writeup and evidence.           #
+# # asked to create the Host/Site folder ("default") when it already      #
+# # exists. rclone issues MKCOL against a file's immediate parent before  #
+# # every upload -- if a file sits directly in content/, its remote      #
+# # parent IS the "default" host folder, and the sync hangs retrying,    #
+# # then fails. This is checked automatically below via                  #
+# # scripts/check-content-structure.sh. See doc/webdav-mkcol-bug.md for  #
+# # the full writeup and evidence.                                       #
 # ##########################################################################
 #
 # Required environment variables (populated from GitHub Actions secrets/vars):
@@ -40,12 +41,15 @@ set -euo pipefail
 
 RCLONE_REMOTE="dotcms-dev"
 
-# Local source directory that gets mirrored to Dev.
-LOCAL_SOURCE_DIR="./files/live/en-us"
+# This project only ever targets a single dotCMS host/site, "default".
+DOTCMS_HOST="default"
 
-# Remote destination: the bare configured remote, since DOTCMS_DEV_WEBDAV_URL
-# already points directly at the live/<languageId> root.
-LIVE_TARGET="${RCLONE_REMOTE}:"
+# Local source directory that gets mirrored to Dev. content/ maps directly
+# to the "default" host root on the server -- there is no extra locale or
+# host-named subfolder locally.
+LOCAL_SOURCE_DIR="./content"
+
+LIVE_TARGET="${RCLONE_REMOTE}:${DOTCMS_HOST}"
 
 # Common rclone flags:
 #   credentials live in the generated rclone.conf, not on the command line,
@@ -61,17 +65,17 @@ log() {
 }
 
 log "Starting deploy to Dev via rclone/WebDAV"
-log "Remote: ${RCLONE_REMOTE}"
+log "Remote: ${RCLONE_REMOTE} (host: ${DOTCMS_HOST})"
 log "WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL:-<not set>}"
-log "Syncing: ${LOCAL_SOURCE_DIR} -> ${LIVE_TARGET} (${DOTCMS_DEV_WEBDAV_URL:-<not set>})"
+log "Syncing: ${LOCAL_SOURCE_DIR} -> ${LIVE_TARGET} (${DOTCMS_DEV_WEBDAV_URL:-<not set>}/${DOTCMS_HOST})"
 
 # rclone sync mirrors the destination to match the source exactly, including
-# deletions. An empty (or missing) local source would wipe out everything
-# live on the server. Refuse to run rather than risk that.
-if [[ ! -d "${LOCAL_SOURCE_DIR}" ]] || [[ -z "$(find "${LOCAL_SOURCE_DIR}" -type f -print -quit)" ]]; then
-    log "ERROR: ${LOCAL_SOURCE_DIR} does not exist or has no files -- refusing to sync an empty source, which would delete everything on ${LIVE_TARGET}"
-    exit 1
-fi
+# deletions -- an empty local source deletes everything under this host on
+# the server. This is intentional: git/PR review is the source of truth and
+# the safety net (see doc/deploy-empty-source.md). Make sure the directory
+# exists so rclone doesn't error on a genuinely missing path (e.g. nothing
+# has ever been committed here yet).
+mkdir -p "${LOCAL_SOURCE_DIR}"
 
 # See the WARNING at the top of this file and doc/webdav-mkcol-bug.md.
 if ! ./scripts/check-content-structure.sh "${LOCAL_SOURCE_DIR}"; then
