@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+$response.setContentType("application/xml")
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<url>
+    <loc>https://www.${host}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$date.calendar)</lastmod>
+    <priority>1.0</priority>
+</url>
+
+## PAGES
+#foreach($x in $dotcontent.pull("+contentType:htmlpageasset +(htmlpageasset.sitemap:*true* htmlpageasset.sitemap_dotraw:*true*) +variant:default",0,""))
+#if($UtilMethods.isSet($x.sitemapImportance.selectValue))
+    #set($priority = ${x.sitemapImportance.selectValue})
+#else 
+    #set($priority = "0.50")
+#end
+#set($url = $x.url.replace("/index", "/"))
+<url>
+    <loc>https://www.${host}${url}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$x.modDate)</lastmod>
+    <priority>${priority}</priority>
+</url>
+#end
+
+## Destination
+#foreach($d in $dotcontent.pull("+contentType:Destination +(Destination.sitemap:*true* Destination.sitemap_dotraw:*true*) +variant:default",0,""))
+#if($UtilMethods.isSet($d.sitemapImportance.selectValue))
+    #set($priority = ${d.sitemapImportance.selectValue})
+#else 
+    #set($priority = "0.50")
+#end
+#set($url = $d.url.replace("/index", "/"))
+<url>
+    <loc>https://www.${host}${url}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$d.modDate)</lastmod>
+    <priority>${priority}</priority>
+</url>
+#end
+
+## Product Line
+#foreach($p in $dotcontent.pull("+contentType:ProductLineLandingPage +(ProductLineLandingPage.sitemap:*true* ProductLineLandingPage.sitemap_dotraw:*true*) +variant:default",0,""))
+#if($UtilMethods.isSet($p.sitemapImportance.selectValue))
+    #set($priority = ${p.sitemapImportance.selectValue})
+#else 
+    #set($priority = "0.50")
+#end
+#set($url = $p.url.replace("/index", "/"))
+<url>
+    <loc>https://www.${host}${url}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$p.modDate)</lastmod>
+    <priority>${priority}</priority>
+</url>
+#end
+
+## BLOGS
+#foreach($b in $dotcontent.pull("+contentType:Blog +(Blog.sitemap:*true* Blog.sitemap_dotraw:*true*) +variant:default",0,"Blog.postingDate desc"))
+#if($UtilMethods.isSet($b.urlMap))
+#if($UtilMethods.isSet($b.sitemapImportance.selectValue))
+    #set($priority = ${b.sitemapImportance.selectValue})
+#else 
+    #set($priority = "0.50")
+#end
+<url>
+    <loc>https://www.${host}${b.urlMap}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$b.postingDate)</lastmod>
+    <priority>${priority}</priority>
+</url>
+#end
+#end
+
+## URL MAP CONTENT
+#foreach($u in $dotcontent.pull("+live:true  +(( urlmap:/activities/* OR urlmap:/events/* OR urlmap:/store/*))",0,""))
+#if($UtilMethods.isSet($u.urlMap))
+#if($UtilMethods.isSet($u.sitemapImportance.selectValue))
+    #set($priority = ${u.sitemapImportance.selectValue})
+#else 
+    #set($priority = "0.50")
+#end
+<url>
+    <loc>https://www.${host}${u.urlMap}</loc>
+    <lastmod>$date.format('yyyy-MM-dd',$u.modDate)</lastmod>
+    <priority>${priority}</priority>
+</url>
+#end
+#end
+
+</urlset>
