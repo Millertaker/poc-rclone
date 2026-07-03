@@ -1,9 +1,8 @@
-# GitHub setup: Actions secrets/variables, branch protection, and required checks
+# GitHub setup: Actions secrets/variables and branch protection
 
 This documents the one-time GitHub configuration needed for
 `.github/workflows/deploy-to-dev.yml` (deploy to Dev on merge to `main`)
-and `.github/workflows/pr-checks.yml` (structural checks on every PR) to
-work as intended, including a real gotcha we hit while setting this up.
+to work as intended, including a real gotcha we hit while setting this up.
 
 ## 1. Repository secrets and variables
 
@@ -59,9 +58,12 @@ and "Applies to N branches" shows at least 1.
 - ✅ **Require a pull request before merging** — blocks direct pushes to
   `main`; all changes must go through a PR.
   - ✅ **Require approvals** — set to `1` (or more).
-- ✅ **Require status checks to pass before merging** — see step 4 below
-  for how to actually select a check here; it can't be picked until it
-  has run at least once.
+- ✅ **Require status checks to pass before merging** — e.g. Semgrep, if
+  configured as a required check. A status check can't be selected here
+  until it has run at least once for this repo (GitHub only lists checks
+  that have posted a result in the last week) — and the list in the search
+  box only populates once you type a query, it doesn't show anything by
+  default.
 - Optional, not currently enabled here: `Dismiss stale approvals`,
   `Require review from Code Owners`, `Require conversation resolution`,
   `Require signed commits`, `Require linear history`,
@@ -69,38 +71,7 @@ and "Applies to N branches" shows at least 1.
   `enforce_admins` maps to in the GitHub UI — enable it if admins should
   also be blocked by these rules, not just regular contributors).
 
-## 4. Making the PR structural check block merges
-
-`.github/workflows/pr-checks.yml` runs
-`scripts/check-content-structure.sh` on every PR targeting `main` (see
-`doc/webdav-mkcol-bug.md` for what it checks and why). By default this
-check can **fail without blocking the merge button** — "failing" and
-"required" are two different things in GitHub. To make a failing check
-actually block merging:
-
-1. **The check has to run at least once** before GitHub will offer it as
-   an option. GitHub only lists status checks that have posted a result
-   in the last week for this repo. Open any PR against `main` (even a
-   throwaway one) so `pr-checks.yml` fires once.
-2. Go to `Settings → Branches` → edit the rule for `main` (with the
-   correct pattern, per step 3).
-3. Under **Require status checks to pass before merging**, click into the
-   search box and type something (e.g. `loose` or `PR Checks`) — the
-   list only populates once you've typed a query, it does not show
-   available checks by default.
-4. Select:
-   ```
-   No loose files in host root (see doc/webdav-mkcol-bug.md)
-   ```
-   This is the job name from `pr-checks.yml`, not the workflow name — if
-   the job is renamed later, re-select it here too.
-5. Save.
-
-Once this is set, any PR where `check-content-structure.sh` fails will
-show a red ❌ and the `Merge pull request` button will be disabled, not
-just show a warning.
-
-## 5. Triggering the deploy workflow manually (optional)
+## 4. Triggering the deploy workflow manually (optional)
 
 `.github/workflows/deploy-to-dev.yml` includes `workflow_dispatch`, so it
 can be run on demand from the Actions tab (`Actions → Deploy to Dev → Run

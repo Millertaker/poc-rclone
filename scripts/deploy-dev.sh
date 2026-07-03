@@ -11,21 +11,20 @@
 # this pipeline only runs after a PR has already been reviewed and passed
 # Semgrep on main, content should go live directly.
 #
-# ##########################################################################
-# # WARNING -- NEVER PLACE FILES DIRECTLY IN content/ ITSELF               #
-# #                                                                        #
-# # e.g. content/foo.vtl                                <- WILL FAIL      #
-# #      content/templates/foo.vtl                      <- OK             #
-# #                                                                        #
-# # dotCMS's WebDAV MKCOL handler returns 500 (not the expected 405) when #
-# # asked to create the Host/Site folder ("default") when it already      #
-# # exists. rclone issues MKCOL against a file's immediate parent before  #
-# # every upload -- if a file sits directly in content/, its remote      #
-# # parent IS the "default" host folder, and the sync hangs retrying,    #
-# # then fails. This is checked automatically below via                  #
-# # scripts/check-content-structure.sh. See doc/webdav-mkcol-bug.md for  #
-# # the full writeup and evidence.                                       #
-# ##########################################################################
+# WHY SUBFOLDERS AND ROOT-LEVEL FILES (e.g. content/robots.txt) ARE
+# HANDLED DIFFERENTLY:
+# dotCMS's WebDAV MKCOL handler returns 500 (not the expected 405) when
+# asked to create the Host/Site folder ("default") when it already exists.
+# rclone issues MKCOL against a file's immediate parent before every
+# upload -- for a file directly in content/, that parent IS the "default"
+# host folder, so rclone always fails on it. Subfolders don't have this
+# problem (MKCOL on an existing regular folder works fine), so:
+#   - subfolders (content/templates/, content/widgets/, ...) sync via
+#     rclone, scoped to their own remote path
+#   - files directly in content/ (content/robots.txt, content/sitemap.xml,
+#     or anything else) upload via a raw HTTP PUT, which has no MKCOL
+#     preflight and works fine against the same, already-existing folder
+# See doc/webdav-mkcol-bug.md for the full writeup and evidence.
 #
 # Required environment variables (populated from GitHub Actions secrets/vars):
 #   DOTCMS_DEV_WEBDAV_URL - full WebDAV live URL for the Dev dotCMS instance
@@ -44,12 +43,10 @@ RCLONE_REMOTE="dotcms-dev"
 # This project only ever targets a single dotCMS host/site, "default".
 DOTCMS_HOST="default"
 
-# Local source directory that gets mirrored to Dev. content/ maps directly
-# to the "default" host root on the server -- there is no extra locale or
-# host-named subfolder locally.
+# Local source directory. content/ maps directly to the "default" host
+# root on the server -- there is no extra locale or host-named subfolder
+# locally.
 LOCAL_SOURCE_DIR="./content"
-
-LIVE_TARGET="${RCLONE_REMOTE}:${DOTCMS_HOST}"
 
 # Common rclone flags:
 #   credentials live in the generated rclone.conf, not on the command line,
@@ -67,27 +64,49 @@ log() {
 log "Starting deploy to Dev via rclone/WebDAV"
 log "Remote: ${RCLONE_REMOTE} (host: ${DOTCMS_HOST})"
 log "WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL:-<not set>}"
-log "Syncing: ${LOCAL_SOURCE_DIR} -> ${LIVE_TARGET} (${DOTCMS_DEV_WEBDAV_URL:-<not set>}/${DOTCMS_HOST})"
 
 # rclone sync mirrors the destination to match the source exactly, including
-# deletions -- an empty local source deletes everything under this host on
-# the server. This is intentional: git/PR review is the source of truth and
-# the safety net (see doc/deploy-empty-source.md). Make sure the directory
-# exists so rclone doesn't error on a genuinely missing path (e.g. nothing
-# has ever been committed here yet).
+# deletions -- an empty local subfolder deletes everything under that
+# subfolder on the server. This is intentional: git/PR review is the
+# source of truth and the safety net (see doc/deploy-empty-source.md).
+# Make sure the directory exists so nothing below errors on a genuinely
+# missing path (e.g. nothing has ever been committed here yet).
 mkdir -p "${LOCAL_SOURCE_DIR}"
 
-# See the WARNING at the top of this file and doc/webdav-mkcol-bug.md.
-if ! ./scripts/check-content-structure.sh "${LOCAL_SOURCE_DIR}"; then
-    log "ERROR: refusing to sync -- fix the file placement above and try again"
-    exit 1
-fi
+# --- Sync subfolders via rclone --------------------------------------------
+for subdir in "${LOCAL_SOURCE_DIR}"/*/; do
+    [[ -d "${subdir}" ]] || continue
+    subdir_name="$(basename "${subdir}")"
+    target="${RCLONE_REMOTE}:${DOTCMS_HOST}/${subdir_name}"
 
-if rclone sync "${LOCAL_SOURCE_DIR}" "${LIVE_TARGET}" "${RCLONE_FLAGS[@]}"; then
-    log "Sync succeeded (${LIVE_TARGET}). Content saved and published."
-else
-    log "ERROR: sync FAILED (${LOCAL_SOURCE_DIR} -> ${LIVE_TARGET})"
-    exit 1
-fi
+    log "Syncing folder '${subdir_name}': ${subdir} -> ${target}"
+
+    if rclone sync "${subdir}" "${target}" "${RCLONE_FLAGS[@]}"; then
+        log "Sync succeeded for '${subdir_name}' (${target})"
+    else
+        log "ERROR: sync FAILED for '${subdir_name}' (${subdir} -> ${target})"
+        exit 1
+    fi
+done
+
+# --- Upload root-level files via a raw HTTP PUT ----------------------------
+#
+# No automatic deletion here: this only pushes what currently exists
+# locally. If a root file is removed from content/, remove it from Dev
+# manually.
+for root_file in "${LOCAL_SOURCE_DIR}"/*; do
+    [[ -f "${root_file}" ]] || continue
+    filename="$(basename "${root_file}")"
+    target_url="${DOTCMS_DEV_WEBDAV_URL%/}/${DOTCMS_HOST}/${filename}"
+
+    log "Uploading root file '${filename}' -> ${target_url}"
+
+    if curl -fsS -u "${DOTCMS_USER}:${DOTCMS_PASS}" -T "${root_file}" "${target_url}"; then
+        log "Uploaded '${filename}'"
+    else
+        log "ERROR: failed to upload '${filename}' -> ${target_url}"
+        exit 1
+    fi
+done
 
 log "Deploy complete."
