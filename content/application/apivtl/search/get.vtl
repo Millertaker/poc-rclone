@@ -1,0 +1,94 @@
+##SETTING VARIABLES =========
+
+#set($exclude = "-mimeType:*css* -mimeType:*js* -mimeType:*plain  -mimeType:*jpg -mimeType:*png -mimeType:*jpeg -mimeType:*javascript* -mimeType:*velocity*")
+
+#if ($UtilMethods.isSet($request.getParameter("q")))
+    #set($q = $request.getParameter("q"))
+#end
+
+#set($show = $request.getParameter("limit"))
+#if(! $UtilMethods.isSet($show))
+    #set($show = "20")
+#end 
+
+#set($page = $request.getParameter("p"))
+#if(! $UtilMethods.isSet($page))
+    #set($page = 0)
+#end
+
+#set($page = $math.add($page, 0))
+#if($page < 0)
+    #set($page = 0)
+#end
+
+#set($offset = $math.mul($page, $math.toInteger($show)))
+#set($end = $math.mul($math.add($page,1), $math.toInteger($show)))
+
+
+
+#if($UtilMethods.isSet($request.getParameter("q")))
+
+## QUERY =============
+    #set($runQ = $q.replaceAll("\"", ""))
+    #set($newQ = "")
+    #if(!$runQ.contains("+"))
+    #foreach($xx in $runQ.split(" "))
+        #set($newQ = " $newQ +(content:$xx title:$xx $xx*) ")
+        #end
+        #set($runQ = "$newQ")
+        #end
+        #if($UtilMethods.isSet($mimeType))
+    #set($runQ = "$runQ +mimeType:$mimeType")
+    #end
+
+    #if($UtilMethods.isSet($keyword))
+        #if($keyword.contains(" "))
+            #set($runQ = "$runQ +keywords:${esc.q}$keyword${esc.q}")
+        #else
+            #set($runQ = "$runQ +keywords:$keyword")
+        #end
+    #end
+
+    #if($UtilMethods.isSet($modifiedOn))
+        #set($runQ = "$runQ +modified:$modifiedOn")
+    #end
+
+    #set($runQ = "$runQ $exclude")
+
+
+    ##CALLING SEARCH VIEWTOOL =======
+    ##set($indexToSearch = "Site Search")
+    ## null for the first argument searches the 'default' index
+    #set($searchresults = $sitesearch.search($!runQ, $offset, $end))
+#end
+
+#set($returnResults = [])
+#foreach($result in $searchresults.results)
+
+        #set($map = {})
+        $map.put("id", $result.id)
+        $map.put("uri", $result.uri)
+        $map.put("title", $result.title)
+        $map.put("host", $result.host)
+        $map.put("score", $result.score)
+        $map.put("language", $result.language)
+        $map.put("keywords", $result.keywords)
+        $map.put("description", $result.description)
+        $map.put("contentLength", $result.contentLength)
+        $map.put("author", $result.author)
+        $map.put("modified", $result.modified)
+        $map.put("mimeType", $result.mimeType)
+        #foreach($highlight in $result.highlights)
+            $map.put("highlight", $highlight)
+            #break
+        #end
+        $map.put("matches", ${result.highlights.size()})
+        $returnResults.add($map)  
+
+#end
+
+$dotJSON.put("results", $returnResults))
+$dotJSON.put("size", $searchresults.size))
+$dotJSON.put("query", $json.generate($searchresults.query)))
+
+
