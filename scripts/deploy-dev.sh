@@ -60,7 +60,7 @@ LOCAL_SOURCE_DIR="./content"
 #   4 parallel transfers) -- the post-upload size check would come back
 #   with another file's size, failing with "corrupted on transfer". Forcing
 #   one file at a time avoids that race.
-RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**" --transfers 1)
+RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**" --exclude ".DS_Store" --transfers 1)
 
 log() {
     printf '[deploy-dev] %s\n' "$1"
@@ -77,6 +77,25 @@ log "WebDAV URL: ${DOTCMS_DEV_WEBDAV_URL:-<not set>}"
 # Make sure the directory exists so nothing below errors on a genuinely
 # missing path (e.g. nothing has ever been committed here yet).
 mkdir -p "${LOCAL_SOURCE_DIR}"
+
+# --- Remove remote subfolders that no longer exist locally ------------------
+#
+# The loop below only ever syncs subfolders that still exist in
+# LOCAL_SOURCE_DIR, so it can create/update/clean up files *within* an
+# existing subfolder, but it can never notice (and therefore never delete)
+# a whole subfolder that was removed locally -- it simply never visits it.
+# List what's on the server first and purge anything that's gone locally.
+while IFS= read -r remote_subdir; do
+    [[ -z "${remote_subdir}" ]] && continue
+    remote_subdir="${remote_subdir%/}"
+    if [[ ! -d "${LOCAL_SOURCE_DIR}/${remote_subdir}" ]]; then
+        log "Removing remote folder '${remote_subdir}' (no longer exists locally)"
+        if ! rclone purge "${RCLONE_REMOTE}:${DOTCMS_HOST}/${remote_subdir}"; then
+            log "ERROR: failed to remove remote folder '${remote_subdir}'"
+            exit 1
+        fi
+    fi
+done < <(rclone lsf "${RCLONE_REMOTE}:${DOTCMS_HOST}" --dirs-only --exclude "system/**" 2>/dev/null || true)
 
 # --- Sync subfolders via rclone --------------------------------------------
 for subdir in "${LOCAL_SOURCE_DIR}"/*/; do

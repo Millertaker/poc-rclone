@@ -51,7 +51,7 @@ LIVE_SOURCE="${RCLONE_REMOTE}:${DOTCMS_HOST}"
 # every user, but it lives outside the "default" host anyway, so it's
 # never touched by this pull. --exclude kept here in case a future host
 # path ever surfaces something similar.
-RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**")
+RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**" --exclude ".DS_Store")
 
 log() {
     printf '[pull-dev] %s\n' "$1"
