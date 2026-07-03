@@ -55,7 +55,12 @@ LOCAL_SOURCE_DIR="./content"
 #   the CMS Admin/Administrator role over WebDAV
 #   (https://dev.dotcms.com/docs/webdav) and aren't part of the
 #   template/page content this script deploys, so exclude that path.
-RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**")
+#   --transfers 1: dotCMS's WebDAV appears to race when multiple sibling
+#   files in the same folder are uploaded concurrently (rclone's default is
+#   4 parallel transfers) -- the post-upload size check would come back
+#   with another file's size, failing with "corrupted on transfer". Forcing
+#   one file at a time avoids that race.
+RCLONE_FLAGS=(--checksum --progress --stats=15s --exclude "system/**" --transfers 1)
 
 log() {
     printf '[deploy-dev] %s\n' "$1"
